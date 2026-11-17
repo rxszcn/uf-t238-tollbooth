@@ -179,9 +179,16 @@ func (l *Limiter) GetContextValueEntryExpirationTTL() time.Duration {
 }
 
 // SetMax is thread-safe way of setting maximum number of requests to limit per second.
+// The new limit is propagated immediately to all existing token buckets,
+// so already-seen keys pick up the new rate without waiting for bucket expiry.
 func (l *Limiter) SetMax(max float64) *Limiter {
 	l.Lock()
 	l.max = max
+	for _, key := range l.tokenBuckets.Keys() {
+		if bucket, found := l.tokenBuckets.Get(key); found {
+			bucket.SetLimit(rate.Limit(max))
+		}
+	}
 	l.Unlock()
 
 	return l
@@ -195,9 +202,16 @@ func (l *Limiter) GetMax() float64 {
 }
 
 // SetBurst is thread-safe way of setting maximum burst size.
+// The new burst is propagated immediately to all existing token buckets,
+// so already-seen keys pick up the new burst without waiting for bucket expiry.
 func (l *Limiter) SetBurst(burst int) *Limiter {
 	l.Lock()
 	l.burst = burst
+	for _, key := range l.tokenBuckets.Keys() {
+		if bucket, found := l.tokenBuckets.Get(key); found {
+			bucket.SetBurst(burst)
+		}
+	}
 	l.Unlock()
 
 	return l
